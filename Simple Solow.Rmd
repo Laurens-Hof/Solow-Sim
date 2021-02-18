@@ -1,0 +1,94 @@
+---
+title: "Simple Solow"
+author: "Laurens Hof"
+date: "October 3, 2020"
+output: html_document
+---
+
+This markdown file contains a very basic Solow Growth Model: it has a rule-based savings rate and exogenous Total Factor Productivity growth. Nevertheless, it should do a good job illustrating transitional dynamics.
+
+## **How to use this file**
+
+ - The first time you open the file, run the "hygiene" and "packages" chunks. Next, run the "customization" and "initialization" chunks. Re-run them each time you want to include a change you made into the simulation. After that, run "computation". This will complete the simulation, and return the graph you specified in "customization". You also will be able to add scripted shocks
+
+```{r hygiene}
+rm(list = ls())
+if(!is.null(dev.list())) dev.off()
+```
+
+```{r packages}
+library(ggplot2)
+library(dplyr)
+```
+
+In the following code chunk, you can customize the variables that recommended for experimentation, such as TFP growth, the savings rate, and initial conditions. You can also set which output graph you want: "income", "income per capita", "log income" or "log income per capita" (recommended).
+```{r customization}
+#basics
+simLength <- 100
+graph <- "income per capita"
+
+#initial conditions
+startPop <- 1000
+startCap <- 300
+startTfp <- 1
+
+#dynamic variables
+tfpGrowth <- 0.015
+popGrowth <- 0.01
+savingsRate <- 0.3
+```
+
+In the next chunk, other setup is done. Alterations can be made, but they are slightly more complicated. Maybe back up the file before fooling around with this one.
+```{r initialization}
+#add some other variables
+shockSigma <- 0.02
+alpha <- 0.3
+depreciation <- 0.05
+
+#define production function
+prodFunc <- function(pop, cap, tfp, alpha, noise){
+  (tfp * pop)^(1 - alpha) * cap^alpha * (1 + rnorm(n = 1, mean = 0, sd = noise))
+  }
+
+#create the table
+table <- data.frame(matrix(ncol = 5, nrow = simLength))
+colnames(table) <- c("t", "pop", "cap", "tfp", "income")
+
+#set starting values
+table$t <- 1:simLength
+table$pop[1] <- startPop
+table$cap[1] <- startCap
+table$tfp[1] <- startTfp
+```
+
+This chunk runs a loop to compute the growth path, then shows a graph with the result you ordered in "customization". It is self-contained, so once you have run the setup chunks you can keep clicking "play" and you will get a different outcome, but with the same structural variables.
+```{r computation}
+for(i in (1:length(table$t))){
+ table$income[i] <- prodFunc(table$pop[i], table$cap[i], table$tfp[i], alpha, shockSigma)
+ 
+ if(i < 100){
+   table$cap[i + 1] <- table$cap[i]*(1 - depreciation) + savingsRate*table$income[i]
+   table$pop[i + 1] <- table$pop[i]*(1 + popGrowth)
+   table$tfp[i + 1] <- table$tfp[i]*(1 + tfpGrowth)
+ }
+}
+
+table$logincome <- log(table$income)
+table$incomepercapita <- table$income/table$pop
+table$logincomepercapita <- log(table$incomepercapita)
+
+if(graph == "log income per capita"){
+  ggplot(data = table) +
+    geom_line(mapping = aes(x = t, y = logincomepercapita))
+}else if(graph == "log income"){
+  ggplot(data = table) +
+    geom_line(mapping = aes(x = t, y = logincome))
+}else if(graph == "income per capita"){
+  ggplot(data = table) +
+    geom_line(mapping = aes(x = t, y = incomepercapita))
+}else if(graph == "income"){
+  ggplot(data = table) +
+    geom_line(mapping = aes(x = t, y = income))
+}
+```
+
